@@ -2068,7 +2068,9 @@ func (t *Terminal) UpdateList(result MatchResult) {
 		prevIndex = t.targetIndex
 		t.targetIndex = minItem.Index()
 	}
-	t.progress = 100
+	if result.final() {
+		t.progress = 100
+	}
 	t.merger = merger
 	t.resultMerger = merger
 	t.passMerger = result.passMerger
@@ -8614,6 +8616,7 @@ func (t *Terminal) Loop() error {
 		reload := changed || newCommand != nil
 		if reload {
 			t.wait.searching = true
+			t.progress = 0
 		}
 		var reloadRequest *searchRequest
 		if reload {
