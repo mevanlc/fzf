@@ -1556,6 +1556,14 @@ func (t *Terminal) visibleInputLinesInList() int {
 
 // Extra number of lines needed to display fzf
 func (t *Terminal) extraLines() int {
+	// borderLines() reports zero for BorderInline, but addInline() still
+	// reserves a divider line for it
+	sectionLines := func(shape tui.BorderShape) int {
+		if shape == tui.BorderInline {
+			return 1
+		}
+		return borderLines(shape)
+	}
 	extra := 0
 	if !t.inputless {
 		extra++
@@ -1571,16 +1579,16 @@ func (t *Terminal) extraLines() int {
 	}
 	if t.headerVisible {
 		if t.hasHeaderWindow() {
-			extra += borderLines(t.headerBorderShape)
+			extra += sectionLines(t.headerBorderShape)
 		}
 		extra += len(t.header0)
 		if w, shape := t.determineHeaderLinesShape(); w {
-			extra += borderLines(shape)
+			extra += sectionLines(shape)
 		}
 		extra += t.headerLines
 	}
 	if len(t.footer) > 0 {
-		extra += borderLines(t.footerBorderShape)
+		extra += sectionLines(t.footerBorderShape)
 		extra += len(t.footer)
 	}
 	return extra
