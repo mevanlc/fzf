@@ -27,7 +27,6 @@ const (
 	queryTimeout    = 500 * time.Millisecond
 	maxInputBuffer  = 1024 * 1024
 	escapeLookback  = 256
-	maxSelectTries  = 100
 )
 
 const DefaultTtyDevice string = "/dev/tty"
