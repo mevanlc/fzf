@@ -229,6 +229,7 @@ func Run(opts *Options) (int, error) {
 	}
 
 	nth := opts.Nth
+	caseMode := opts.Case
 	inputRevision := revision{}
 	snapshotRevision := revision{}
 	patternCache := make(map[string]*Pattern)
@@ -252,7 +253,7 @@ func Run(opts *Options) (int, error) {
 		denylistCopy := maps.Clone(denylist)
 		denyMutex.Unlock()
 		return BuildPattern(cache, patternCache,
-			opts.Fuzzy, opts.FuzzyAlgo, opts.Extended, opts.Case, opts.Normalize, forward, withPos,
+			opts.Fuzzy, opts.FuzzyAlgo, opts.Extended, caseMode, opts.Normalize, forward, withPos,
 			opts.Filter == nil, nth, opts.Delimiter, inputRevision, runes, denylistCopy, headerLines)
 	}
 	matcher := NewMatcher(cache, patternBuilder, sort, opts.Tac, eventBox, inputRevision, opts.Threads)
@@ -489,6 +490,10 @@ func Run(opts *Options) (int, error) {
 					switch val := value.(type) {
 					case searchRequest:
 						sort = val.sort
+						if caseMode != val.caseMode {
+							caseMode = val.caseMode
+							patternCache = make(map[string]*Pattern)
+						}
 						command = val.command
 						environ = val.environ
 						changed = val.changed

@@ -262,6 +262,28 @@ const (
 	CaseRespect
 )
 
+func (c Case) next() Case {
+	switch c {
+	case CaseIgnore:
+		return CaseSmart
+	case CaseSmart:
+		return CaseRespect
+	default:
+		return CaseIgnore
+	}
+}
+
+func (c Case) String() string {
+	switch c {
+	case CaseIgnore:
+		return "ignore-case"
+	case CaseRespect:
+		return "case-sensitive"
+	default:
+		return "smart-case"
+	}
+}
+
 // Sort criteria
 type criterion int
 
@@ -649,6 +671,7 @@ type Options struct {
 	Exit0             bool
 	Filter            *string
 	ToggleSort        bool
+	ToggleCase        bool
 	Expect            map[tui.Event]string
 	Keymap            map[tui.Event][]*action
 	Preview           previewOpts
@@ -1926,6 +1949,8 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actTogglePreviewWrapWord)
 		case "toggle-sort":
 			appendAction(actToggleSort)
+		case "toggle-case":
+			appendAction(actToggleCase)
 		case "offset-up":
 			appendAction(actOffsetUp)
 		case "offset-down":
@@ -3810,6 +3835,8 @@ func postProcessOptions(opts *Options) error {
 			case actToggleSort:
 				// To display "+S"/"-S" on info line
 				opts.ToggleSort = true
+			case actToggleCase:
+				opts.ToggleCase = true
 			case actTogglePreview, actShowPreview, actHidePreview, actChangePreviewWindow:
 				reordered = append(reordered, act)
 			}

@@ -335,6 +335,8 @@ type Terminal struct {
 	multiLine            bool
 	sort                 bool
 	toggleSort           bool
+	caseMode             Case
+	toggleCase           bool
 	track                trackOption
 	idNth                []Range
 	trackKey             string
@@ -743,6 +745,7 @@ const (
 	actExcludeMulti
 	actAsync
 	actWait
+	actToggleCase
 )
 
 func (a actionType) Name() string {
@@ -815,6 +818,7 @@ type withNthSpec struct {
 
 type searchRequest struct {
 	sort        bool
+	caseMode    Case
 	sync        bool
 	nth         *[]Range
 	withNth     *withNthSpec
@@ -1078,6 +1082,8 @@ func NewTerminal(opts *Options, eventBox *util.EventBox, executor *util.Executor
 		wrapWord:           opts.WrapWord,
 		sort:               opts.Sort > 0,
 		toggleSort:         opts.ToggleSort,
+		caseMode:           opts.Case,
+		toggleCase:         opts.ToggleCase,
 		track:              opts.Track,
 		idNth:              opts.IdNth,
 		targetIndex:        minItem.Index(),
@@ -3538,6 +3544,9 @@ func (t *Terminal) printInfoImpl() {
 		} else {
 			output += " -S"
 		}
+	}
+	if t.toggleCase {
+		output += " [" + t.caseMode.String() + "]"
 	}
 	if t.track.Global() {
 		if t.trackBlocked {
@@ -7195,6 +7204,11 @@ func (t *Terminal) Loop() error {
 			case actToggleSort:
 				t.sort = !t.sort
 				changed = true
+			case actToggleCase:
+				t.caseMode = t.caseMode.next()
+				t.toggleCase = true
+				changed = true
+				req(reqInfo)
 			case actPreviewTop:
 				if t.hasPreviewWindow() {
 					scrollPreviewTo(0)
@@ -8592,7 +8606,7 @@ func (t *Terminal) Loop() error {
 		}
 		var reloadRequest *searchRequest
 		if reload {
-			reloadRequest = &searchRequest{sort: t.sort, sync: reloadSync, nth: newNth, withNth: newWithNth, headerLines: newHeaderLines, command: newCommand, environ: t.environ(), changed: changed, denylist: denylist, revision: t.resultMerger.Revision()}
+			reloadRequest = &searchRequest{sort: t.sort, caseMode: t.caseMode, sync: reloadSync, nth: newNth, withNth: newWithNth, headerLines: newHeaderLines, command: newCommand, environ: t.environ(), changed: changed, denylist: denylist, revision: t.resultMerger.Revision()}
 		}
 
 		// Dispatch queued background requests

@@ -38,6 +38,7 @@ type Matcher struct {
 	cache          *ChunkCache
 	patternBuilder func([]rune) *Pattern
 	sort           bool
+	caseMode       Case
 	tac            bool
 	eventBox       *util.EventBox
 	reqBox         *util.EventBox
@@ -105,10 +106,14 @@ func (m *Matcher) Loop() {
 		}
 
 		cacheCleared := false
-		if request.sort != m.sort || request.revision != m.revision {
+		caseChanged := request.pattern.caseMode != m.caseMode
+		if caseChanged || request.sort != m.sort || request.revision != m.revision {
 			m.sort = request.sort
+			m.caseMode = request.pattern.caseMode
 			m.mergerCache = make(map[string]MatchResult)
-			if !request.revision.compatible(m.revision) {
+			if caseChanged || !request.revision.compatible(m.revision) {
+				// Previous scan workers have finished, so they cannot repopulate
+				// the cache with results from the old case mode after this clear.
 				m.cache.Clear()
 			}
 			m.revision = request.revision

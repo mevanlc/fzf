@@ -59,6 +59,11 @@ Case-sensitive match
 Smart-case match (default). In this mode, the search is case-insensitive by
 default, but it becomes case-sensitive if the query contains any uppercase
 letters.
+.br
+Bind \fBtoggle\-case\fR to cycle at runtime through ignore-case, smart-case,
+and case-sensitive matching, preserving the query and selections. For example:
+\fB\-\-bind ctrl-s:toggle-case\fR. The current mode is shown on the info line
+when this action is bound.
 .TP
 .B "\-\-literal"
 Do not normalize latin script letters for matching.
@@ -2144,6 +2149,7 @@ A key or an event can be bound to one or more of the following actions.
     \fBtoggle\-preview\-wrap\-word\fR
     \fBtoggle\-raw\fR                   (toggle raw mode for displaying non-matching items)
     \fBtoggle\-search\fR                (toggle search functionality)
+    \fBtoggle\-case\fR                  (cycle ignore-case, smart-case, case-sensitive)
     \fBtoggle\-sort\fR
     \fBtoggle\-track\fR                 (toggle global tracking option (\fB\-\-track\fR))
     \fBtoggle\-track\-current\fR         (toggle tracking of the current item)

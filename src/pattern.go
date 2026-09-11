@@ -52,6 +52,7 @@ type Pattern struct {
 	caseSensitive bool
 	normalize     bool
 	forward       bool
+	caseMode      Case
 	withPos       bool
 	text          []rune
 	termSets      []termSet
@@ -89,8 +90,7 @@ func BuildPattern(cache *ChunkCache, patternCache map[string]*Pattern, fuzzy boo
 		asString = string(runes)
 	}
 
-	// We can uniquely identify the pattern for a given string since
-	// search mode and caseMode do not change while the program is running
+	// The caller clears patternCache when matching options change.
 	cached, found := patternCache[asString]
 	if found {
 		return cached
@@ -137,6 +137,7 @@ func BuildPattern(cache *ChunkCache, patternCache map[string]*Pattern, fuzzy boo
 		fuzzyAlgo:     fuzzyAlgo,
 		extended:      extended,
 		caseSensitive: caseSensitive,
+		caseMode:      caseMode,
 		normalize:     normalize,
 		forward:       forward,
 		withPos:       withPos,

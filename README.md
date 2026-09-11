@@ -396,6 +396,12 @@ fzf --popup bottom,80%,40% # Bottom, 80% width, 40% height
 
 ### Search syntax
 
+This local build adds `--bind ctrl-s:toggle-case` to cycle **ignore-case →
+smart-case → case-sensitive → ignore-case** while the picker stays open. The
+query and selections are preserved, and the info line shows the active mode.
+Use `--ignore-case` to start the cycle in ignore-case mode; otherwise the normal
+startup case option determines the initial mode.
+
 Unless otherwise specified, fzf starts in "extended-search mode" where you can
 type in multiple search terms delimited by spaces. e.g. `^music .mp3$ sbtrkt
 !fire`
