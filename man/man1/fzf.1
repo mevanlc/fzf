@@ -413,6 +413,9 @@ Adaptive height has the following limitations:
 * Cannot be used with top/bottom margin and padding given in percent size
 .br
 * It will not find the right size when there are multi-line items
+.br
+* fzf cannot start until the input ends or exceeds the height, so a stream
+that stays below it will delay the first render
 
 .TP
 .BI "\-\-min\-height=" "HEIGHT[+]"
