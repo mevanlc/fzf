@@ -396,11 +396,39 @@ fzf --popup bottom,80%,40% # Bottom, 80% width, 40% height
 
 ### Search syntax
 
-This local build adds `--bind ctrl-s:toggle-case` to cycle **ignore-case →
-smart-case → case-sensitive → ignore-case** while the picker stays open. The
-query and selections are preserved, and the info line shows the active mode.
-Use `--ignore-case` to start the cycle in ignore-case mode; otherwise the normal
-startup case option determines the initial mode.
+This local build adds `change-case-sensitive(...)` to change case matching while
+the picker stays open. The query, editing position, and marked selections are
+preserved, and the info line shows the active mode.
+
+```sh
+fzf --ignore-case --bind 'ctrl-s:change-case-sensitive()'
+```
+
+| Action argument | Behavior |
+| --- | --- |
+| `*` | Remember and cycle through `no-ignore → smart-case → ignore`. |
+| Empty, `()` | Repeat the remembered cycle; use the `*` cycle if none exists. |
+| `ignore`, `no-ignore`, or `smart-case` | Remember a singleton and set that mode. |
+| `mode\|mode\|...` | Remember the normalized list and advance relative to the current mode. |
+
+An empty entry in a nonempty argument resolves to the effective startup mode
+(after environment defaults and command-line options). Resolve these entries
+first, then deduplicate concrete modes while retaining their first occurrence.
+For example, `change-case-sensitive(no-ignore|||ignore)` has the same meaning
+as `change-case-sensitive(no-ignore||ignore)`. With `--no-ignore-case`,
+`change-case-sensitive(|no-ignore)` reduces to the singleton `no-ignore`.
+`change-case-sensitive(|)` always reduces to the startup-mode singleton.
+
+Every executed explicit argument replaces the picker-wide remembered cycle,
+including singletons and `*`. Empty `()` calls reuse that cycle across bindings.
+Cycling selects the entry after the current mode, wrapping around; if the
+current mode is absent, it selects the first entry. `*` is only valid as the
+entire argument. Mode names are exactly `ignore`, `no-ignore`, and `smart-case`;
+`default` is not a mode name.
+
+The example above starts in ignore-case mode. Ctrl-S then cycles through
+**case-sensitive → smart-case → ignore-case**. The normal startup case option
+determines the initial mode in other invocations.
 
 Unless otherwise specified, fzf starts in "extended-search mode" where you can
 type in multiple search terms delimited by spaces. e.g. `^music .mp3$ sbtrkt

@@ -60,10 +60,10 @@ Smart-case match (default). In this mode, the search is case-insensitive by
 default, but it becomes case-sensitive if the query contains any uppercase
 letters.
 .br
-Bind \fBtoggle\-case\fR to cycle at runtime through ignore-case, smart-case,
-and case-sensitive matching, preserving the query and selections. For example:
-\fB\-\-bind ctrl-s:toggle-case\fR. The current mode is shown on the info line
-when this action is bound.
+Bind \fBchange\-case\-sensitive()\fR to cycle case modes at runtime, preserving
+the query and selections. For example:
+\fB\-\-bind 'ctrl-s:change-case-sensitive()'\fR. The current mode is shown on
+the info line when this action is bound. See \fBCHANGE CASE SENSITIVITY\fR.
 .TP
 .B "\-\-literal"
 Do not normalize latin script letters for matching.
@@ -2051,6 +2051,7 @@ A key or an event can be bound to one or more of the following actions.
     \fBbg\-cancel\fR                    (cancel background transform processes)
     \fBcancel\fR                       (clear query string if not empty, abort fzf otherwise)
     \fBchange\-border\-label(...)\fR     (change \fB\-\-border\-label\fR to the given string)
+    \fBchange\-case\-sensitive(...)\fR   (set or cycle case modes; see below)
     \fBchange\-ghost(...)\fR            (change ghost text to the given string)
     \fBchange\-header(...)\fR           (change header to the given string; doesn't affect \fB\-\-header\-lines\fR)
     \fBchange\-header\-lines(N)\fR       (change the number of \fB\-\-header\-lines\fR)
@@ -2149,7 +2150,6 @@ A key or an event can be bound to one or more of the following actions.
     \fBtoggle\-preview\-wrap\-word\fR
     \fBtoggle\-raw\fR                   (toggle raw mode for displaying non-matching items)
     \fBtoggle\-search\fR                (toggle search functionality)
-    \fBtoggle\-case\fR                  (cycle ignore-case, smart-case, case-sensitive)
     \fBtoggle\-sort\fR
     \fBtoggle\-track\fR                 (toggle global tracking option (\fB\-\-track\fR))
     \fBtoggle\-track\-current\fR         (toggle tracking of the current item)
@@ -2258,6 +2258,44 @@ current fzf process with the specified command using \fBexecve(2)\fR system
 call.
 
     \fBfzf \-\-bind "enter:become(vim {})"\fR
+
+.SS CHANGE CASE SENSITIVITY
+
+\fBchange\-case\-sensitive(...)\fR changes the native matching mode without
+restarting fzf or replacing the input list. It preserves the query, editing
+position, and marked selections. The info line displays the active mode.
+
+.TP
+.B "change-case-sensitive(*)"
+Remember and cycle through \fBno-ignore|smart-case|ignore\fR.
+.TP
+.B "change-case-sensitive()"
+Cycle through the remembered list. If none exists, use the \fB*\fR cycle.
+.TP
+.B "change-case-sensitive(mode)"
+Remember a singleton list and set the specified mode: \fBignore\fR,
+\fBno-ignore\fR, or \fBsmart-case\fR.
+.TP
+.B "change-case-sensitive(mode|mode|...)"
+Resolve empty entries to the effective startup mode (after environment defaults
+and command-line options), then deduplicate concrete modes in first-occurrence
+order. Remember this list and select the entry after the current mode, wrapping
+around. If the current mode is absent, select the first entry.
+.PP
+An empty entry is distinct from an entirely empty argument. Thus \fB(|)\fR
+resolves to two startup-mode entries and deduplicates to a singleton, restoring
+the startup mode. \fB(no-ignore|||ignore)\fR and \fB(no-ignore||ignore)\fR
+resolve to the same cycle. If the startup mode is \fBno-ignore\fR,
+\fB(|no-ignore)\fR deduplicates to that singleton.
+.PP
+Every executed explicit argument replaces the remembered cycle, including
+singletons and \fB*\fR. This state belongs to the picker and is shared across
+bindings. \fB*\fR is only valid as the entire argument; mode names must be
+exactly \fBignore\fR, \fBno-ignore\fR, or \fBsmart-case\fR.
+.PP
+For example, \fBfzf --ignore-case --bind 'ctrl-s:change-case-sensitive()'\fR
+starts in ignore-case mode, then cycles through case-sensitive, smart-case,
+and ignore-case matching.
 
 .SS RELOAD INPUT
 

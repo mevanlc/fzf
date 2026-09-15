@@ -336,7 +336,9 @@ type Terminal struct {
 	sort                 bool
 	toggleSort           bool
 	caseMode             Case
-	toggleCase           bool
+	caseModeDefault      Case
+	caseModeCycle        []Case
+	caseModeInfo         bool
 	track                trackOption
 	idNth                []Range
 	trackKey             string
@@ -745,7 +747,7 @@ const (
 	actExcludeMulti
 	actAsync
 	actWait
-	actToggleCase
+	actChangeCaseSensitive
 )
 
 func (a actionType) Name() string {
@@ -1083,7 +1085,8 @@ func NewTerminal(opts *Options, eventBox *util.EventBox, executor *util.Executor
 		sort:               opts.Sort > 0,
 		toggleSort:         opts.ToggleSort,
 		caseMode:           opts.Case,
-		toggleCase:         opts.ToggleCase,
+		caseModeDefault:    opts.Case,
+		caseModeInfo:       opts.CaseModeInfo,
 		track:              opts.Track,
 		idNth:              opts.IdNth,
 		targetIndex:        minItem.Index(),
@@ -3545,7 +3548,7 @@ func (t *Terminal) printInfoImpl() {
 			output += " -S"
 		}
 	}
-	if t.toggleCase {
+	if t.caseModeInfo {
 		output += " [" + t.caseMode.String() + "]"
 	}
 	if t.track.Global() {
@@ -7204,11 +7207,11 @@ func (t *Terminal) Loop() error {
 			case actToggleSort:
 				t.sort = !t.sort
 				changed = true
-			case actToggleCase:
-				t.caseMode = t.caseMode.next()
-				t.toggleCase = true
-				changed = true
-				req(reqInfo)
+			case actChangeCaseSensitive:
+				if modeChanged, err := t.changeCaseSensitive(a.a); err == nil {
+					changed = changed || modeChanged
+					req(reqInfo)
+				}
 			case actPreviewTop:
 				if t.hasPreviewWindow() {
 					scrollPreviewTo(0)

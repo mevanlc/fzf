@@ -262,17 +262,6 @@ const (
 	CaseRespect
 )
 
-func (c Case) next() Case {
-	switch c {
-	case CaseIgnore:
-		return CaseSmart
-	case CaseSmart:
-		return CaseRespect
-	default:
-		return CaseIgnore
-	}
-}
-
 func (c Case) String() string {
 	switch c {
 	case CaseIgnore:
@@ -671,7 +660,7 @@ type Options struct {
 	Exit0             bool
 	Filter            *string
 	ToggleSort        bool
-	ToggleCase        bool
+	CaseModeInfo      bool
 	Expect            map[tui.Event]string
 	Keymap            map[tui.Event][]*action
 	Preview           previewOpts
@@ -1695,7 +1684,7 @@ const (
 
 func init() {
 	argActionRegexp = regexp.MustCompile(
-		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|bg-transform|transform)-(?:query|prompt|(?:border|list|preview|input|header|footer)-label|header-lines|header|footer|search|with-nth|nth|pointer|ghost)|bg-transform|transform|change-(?:preview-window|preview|multi)|(?:re|un|toggle-)bind|pos|put|print|search|trigger)`)
+		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|bg-transform|transform)-(?:query|prompt|(?:border|list|preview|input|header|footer)-label|header-lines|header|footer|search|with-nth|nth|pointer|ghost)|bg-transform|transform|change-(?:preview-window|preview|multi|case-sensitive)|(?:re|un|toggle-)bind|pos|put|print|search|trigger)`)
 	splitRegexp = regexp.MustCompile("[,:]+")
 	actionNameRegexp = regexp.MustCompile("(?i)^[a-z-]+")
 }
@@ -1949,8 +1938,6 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actTogglePreviewWrapWord)
 		case "toggle-sort":
 			appendAction(actToggleSort)
-		case "toggle-case":
-			appendAction(actToggleCase)
 		case "offset-up":
 			appendAction(actOffsetUp)
 		case "offset-down":
@@ -2019,6 +2006,10 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 					actions = append(actions, &action{t: t, a: actionArg})
 				}
 				switch t {
+				case actChangeCaseSensitive:
+					if _, err := parseCaseSensitiveModes(actionArg); err != nil {
+						return nil, err
+					}
 				case actUnbind, actRebind, actToggleBind:
 					if _, _, err := parseKeyChords(actionArg, spec[0:offset]+" target required"); err != nil {
 						return nil, err
@@ -2139,6 +2130,8 @@ func isExecuteAction(str string) actionType {
 		return actChangeQuery
 	case "change-multi":
 		return actChangeMulti
+	case "change-case-sensitive":
+		return actChangeCaseSensitive
 	case "change-nth":
 		return actChangeNth
 	case "change-with-nth":
@@ -3835,8 +3828,8 @@ func postProcessOptions(opts *Options) error {
 			case actToggleSort:
 				// To display "+S"/"-S" on info line
 				opts.ToggleSort = true
-			case actToggleCase:
-				opts.ToggleCase = true
+			case actChangeCaseSensitive:
+				opts.CaseModeInfo = true
 			case actTogglePreview, actShowPreview, actHidePreview, actChangePreviewWindow:
 				reordered = append(reordered, act)
 			}
