@@ -1,5 +1,8 @@
-CHANGELOG
-=========
+# CHANGELOG
+
+0.74.5
+------
+- Fixed `--gap-line` cutting a grapheme cluster when filling the last cells of the line (#4920)
 
 0.74.4
 ------
