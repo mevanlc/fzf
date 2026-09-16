@@ -62,8 +62,8 @@ letters.
 .br
 Bind \fBchange\-case\-sensitive()\fR to cycle case modes at runtime, preserving
 the query and selections. For example:
-\fB\-\-bind 'ctrl-s:change-case-sensitive()'\fR. The current mode is shown on
-the info line when this action is bound. See \fBCHANGE CASE SENSITIVITY\fR.
+\fB\-\-bind 'ctrl-s:change-case-sensitive()'\fR. The current mode is exported
+as \fBFZF_CASE_MODE\fR. See \fBCHANGE CASE SENSITIVITY\fR.
 .TP
 .B "\-\-literal"
 Do not normalize latin script letters for matching.
@@ -1517,6 +1517,8 @@ fzf exports the following environment variables to its child processes.
 .br
 .BR FZF_INPUT_STATE "     Current input state (enabled, disabled, hidden)"
 .br
+.BR FZF_CASE_MODE "       Current case mode (ignore, no-ignore, smart-case)"
+.br
 .BR FZF_NTH "             Current \-\-nth option"
 .br
 .BR FZF_WITH_NTH "        Current \-\-with\-nth option"
@@ -2263,7 +2265,8 @@ call.
 
 \fBchange\-case\-sensitive(...)\fR changes the native matching mode without
 restarting fzf or replacing the input list. It preserves the query, editing
-position, and marked selections. The info line displays the active mode.
+position, and marked selections. The info line is unchanged unless customized
+with \fB\-\-info-command\fR.
 
 .TP
 .B "change-case-sensitive(*)"
@@ -2296,6 +2299,16 @@ exactly \fBignore\fR, \fBno-ignore\fR, or \fBsmart-case\fR.
 For example, \fBfzf --ignore-case --bind 'ctrl-s:change-case-sensitive()'\fR
 starts in ignore-case mode, then cycles through case-sensitive, smart-case,
 and ignore-case matching.
+.PP
+\fBFZF_CASE_MODE\fR is exported to child commands whether or not a case-switching
+action is bound. It reports the configured mode: \fBignore\fR, \fBno-ignore\fR,
+or \fBsmart-case\fR. Smart-case remains \fBsmart-case\fR even when an uppercase
+query makes matching case-sensitive.
+.PP
+To display the mode on the info line, opt in with \fB\-\-info-command\fR:
+
+     \fBfzf --bind 'ctrl-s:change-case-sensitive()' \\
+         --info-command='printf "%s [%s]" "$FZF_INFO" "$FZF_CASE_MODE"'\fR
 
 .SS RELOAD INPUT
 

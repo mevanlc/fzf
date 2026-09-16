@@ -71,6 +71,5 @@ func (t *Terminal) changeCaseSensitive(arg string) (bool, error) {
 	changed := next != t.caseMode
 	t.caseModeCycle = cycle
 	t.caseMode = next
-	t.caseModeInfo = true
 	return changed, nil
 }

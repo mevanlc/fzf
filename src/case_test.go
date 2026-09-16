@@ -91,7 +91,7 @@ func TestChangeCaseSensitiveInvalid(t *testing.T) {
 			t.Fatalf("%q: expected error without mode change, got changed=%v err=%v", arg, changed, err)
 		}
 		if terminal.caseMode != CaseSmart || terminal.caseModeDefault != CaseIgnore ||
-			!slices.Equal(terminal.caseModeCycle, []Case{CaseSmart, CaseRespect}) || terminal.caseModeInfo {
+			!slices.Equal(terminal.caseModeCycle, []Case{CaseSmart, CaseRespect}) {
 			t.Fatalf("%q: invalid action changed picker state", arg)
 		}
 		if _, err := parseSingleActionList("change-case-sensitive("+arg+")", false); err == nil {

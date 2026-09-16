@@ -265,9 +265,9 @@ const (
 func (c Case) String() string {
 	switch c {
 	case CaseIgnore:
-		return "ignore-case"
+		return "ignore"
 	case CaseRespect:
-		return "case-sensitive"
+		return "no-ignore"
 	default:
 		return "smart-case"
 	}
@@ -660,7 +660,6 @@ type Options struct {
 	Exit0             bool
 	Filter            *string
 	ToggleSort        bool
-	CaseModeInfo      bool
 	Expect            map[tui.Event]string
 	Keymap            map[tui.Event][]*action
 	Preview           previewOpts
@@ -3828,8 +3827,6 @@ func postProcessOptions(opts *Options) error {
 			case actToggleSort:
 				// To display "+S"/"-S" on info line
 				opts.ToggleSort = true
-			case actChangeCaseSensitive:
-				opts.CaseModeInfo = true
 			case actTogglePreview, actShowPreview, actHidePreview, actChangePreviewWindow:
 				reordered = append(reordered, act)
 			}

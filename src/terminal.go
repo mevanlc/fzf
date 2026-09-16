@@ -338,7 +338,6 @@ type Terminal struct {
 	caseMode             Case
 	caseModeDefault      Case
 	caseModeCycle        []Case
-	caseModeInfo         bool
 	track                trackOption
 	idNth                []Range
 	trackKey             string
@@ -1086,7 +1085,6 @@ func NewTerminal(opts *Options, eventBox *util.EventBox, executor *util.Executor
 		toggleSort:         opts.ToggleSort,
 		caseMode:           opts.Case,
 		caseModeDefault:    opts.Case,
-		caseModeInfo:       opts.CaseModeInfo,
 		track:              opts.Track,
 		idNth:              opts.IdNth,
 		targetIndex:        minItem.Index(),
@@ -1469,6 +1467,7 @@ func (t *Terminal) environImpl(forPreview bool) []string {
 		}
 	}
 	env = append(env, "FZF_INPUT_STATE="+inputState)
+	env = append(env, "FZF_CASE_MODE="+t.caseMode.String())
 	env = append(env, fmt.Sprintf("FZF_TOTAL_COUNT=%d", t.count))
 	env = append(env, fmt.Sprintf("FZF_MATCH_COUNT=%d", t.resultMerger.Length()))
 	env = append(env, fmt.Sprintf("FZF_SELECT_COUNT=%d", len(t.selected)))
@@ -3547,9 +3546,6 @@ func (t *Terminal) printInfoImpl() {
 		} else {
 			output += " -S"
 		}
-	}
-	if t.caseModeInfo {
-		output += " [" + t.caseMode.String() + "]"
 	}
 	if t.track.Global() {
 		if t.trackBlocked {
