@@ -398,7 +398,8 @@ fzf --popup bottom,80%,40% # Bottom, 80% width, 40% height
 
 This local build adds `change-case-sensitive(...)` to change case matching while
 the picker stays open. The query, editing position, and marked selections are
-preserved, and the info line shows the active mode.
+preserved. The info line is unchanged unless you customize it with
+`--info-command`.
 
 ```sh
 fzf --ignore-case --bind 'ctrl-s:change-case-sensitive()'
@@ -429,6 +430,18 @@ entire argument. Mode names are exactly `ignore`, `no-ignore`, and `smart-case`;
 The example above starts in ignore-case mode. Ctrl-S then cycles through
 **case-sensitive → smart-case → ignore-case**. The normal startup case option
 determines the initial mode in other invocations.
+
+`FZF_CASE_MODE` is exported to child commands with the current mode: `ignore`,
+`no-ignore`, or `smart-case`. It is available even without a case-switching
+binding. It reports the configured mode, so `smart-case` remains `smart-case`
+even when an uppercase query makes matching case-sensitive.
+
+To display the mode on the info line, opt in with `--info-command`:
+
+```sh
+fzf --bind 'ctrl-s:change-case-sensitive()' \
+    --info-command='printf "%s [%s]" "$FZF_INFO" "$FZF_CASE_MODE"'
+```
 
 Unless otherwise specified, fzf starts in "extended-search mode" where you can
 type in multiple search terms delimited by spaces. e.g. `^music .mp3$ sbtrkt

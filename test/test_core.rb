@@ -1744,6 +1744,62 @@ class TestCore < TestInteractive
     tmux.until { assert_match(%r{^  --2/10000/10000-- xx}, it[-2]) }
   end
 
+  def test_case_mode_startup
+    [
+      ['', 'smart-case', 1],
+      ['--ignore-case', 'ignore', 2],
+      ['--no-ignore-case', 'no-ignore', 1],
+      ['--smart-case', 'smart-case', 1]
+    ].each do |option, mode, count|
+      # Export the configured mode without a case-action binding, including
+      # smart-case with an uppercase query and an inherited variable to replace.
+      command = fzf(:sync, :no_separator, option, '--query INSTALL',
+                    %q(--info-command 'printf "%s [%s]" "$FZF_INFO" "$FZF_CASE_MODE"'))
+      tmux.send_keys %(printf 'INSTALL\\ninstall\\n' | FZF_CASE_MODE=parent #{command}), :Enter
+      tmux.until { assert_equal "  #{count}/2 [#{mode}]", it[-2] }
+      tmux.send_keys :Enter
+      assert_equal 'INSTALL', fzf_output
+    end
+  end
+
+  def test_case_mode_default_info
+    command = fzf(:sync, :no_separator, :ignore_case, '--query INSTALL',
+                  %q[--bind 'ctrl-s:change-case-sensitive()+transform-header(printf "mode=%s" "$FZF_CASE_MODE")'])
+    tmux.send_keys %(printf 'INSTALL\\ninstall\\n' | #{command}), :Enter
+    tmux.until { assert_equal '  2/2', it[-2] }
+    [['no-ignore', 1], ['smart-case', 1], ['ignore', 2]].each do |mode, count|
+      tmux.send_keys 'C-s'
+      tmux.until do |lines|
+        assert_equal "  #{count}/2", lines[-2]
+        # A child command chained after the action sees the updated mode.
+        assert_includes lines, "  mode=#{mode}"
+      end
+    end
+    tmux.send_keys :Enter
+    assert_equal 'INSTALL', fzf_output
+  end
+
+  def test_info_command_case_mode
+    command = fzf(:sync, :no_separator, :ignore_case,
+                  "--bind 'ctrl-s:change-case-sensitive(),f1:change-case-sensitive(no-ignore)'",
+                  %q(--info-command 'printf "%s [%s]" "$FZF_INFO" "$FZF_CASE_MODE"'))
+    tmux.send_keys %(printf 'INSTALL\\ninstall\\n' | #{command}), :Enter
+    tmux.until { assert_equal '  2/2 [ignore]', it[-2] }
+    # An empty query keeps the result set unchanged throughout the cycle.
+    %w[no-ignore smart-case ignore].each do |mode|
+      tmux.send_keys 'C-s'
+      tmux.until { assert_equal "  2/2 [#{mode}]", it[-2] }
+    end
+    tmux.send_keys :F1
+    tmux.until { assert_equal '  2/2 [no-ignore]', it[-2] }
+    tmux.send_keys 'missing'
+    tmux.until { assert_equal '  0/2 [no-ignore]', it[-2] }
+    tmux.send_keys 'C-u'
+    tmux.until { assert_equal '  2/2 [no-ignore]', it[-2] }
+    tmux.send_keys :Enter
+    assert_equal 'INSTALL', fzf_output
+  end
+
   def test_info_command_inline
     tmux.send_keys(%(seq 10000 | #{FZF} --separator x --info-command 'echo -e "--\\x1b[33m$FZF_POS\\x1b[m/$FZF_INFO--"' --info inline:xx), :Enter)
     tmux.until { assert_match(%r{^>  xx--1/10000/10000-- xx}, it[-1]) }
@@ -2454,6 +2510,7 @@ class TestCore < TestInteractive
       FZF_POS: '1',
       FZF_CURRENT_ITEM: '1',
       FZF_QUERY: '',
+      FZF_CASE_MODE: 'smart-case',
       FZF_POINTER: '>',
       FZF_PROMPT: '> ',
       FZF_INPUT_STATE: 'hidden'
