@@ -1104,6 +1104,12 @@ function! s:execute_term(dict, command, temps) abort
       let fzf.temps.batchfile = s:fzf_tempname().'.bat'
       call s:writefile(s:wrap_cmds(a:command), fzf.temps.batchfile)
       let command = fzf.temps.batchfile
+    elseif has('nvim') && &title && a:command =~ '[[:cntrl:]]'
+      " Neovim puts the command in the buffer name, which can end up raw in
+      " the terminal title (#4941)
+      let fzf.temps.shellscript = s:fzf_tempname()
+      call s:writefile([a:command], fzf.temps.shellscript)
+      let command = 'sh '.fzf#shellescape(fzf.temps.shellscript)
     else
       let command = a:command
     endif
@@ -1118,6 +1124,10 @@ function! s:execute_term(dict, command, temps) abort
       endif
       if is_popup
         let term_opts.hidden = 1
+        " Avoid resizing the terminal after fzf starts (#4957)
+        let bounds = s:popup_bounds()
+        let term_opts.term_rows = bounds.height
+        let term_opts.term_cols = bounds.width
       else
         let term_opts.curwin = 1
       endif

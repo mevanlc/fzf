@@ -1683,21 +1683,21 @@ const (
 
 func init() {
 	argActionRegexp = regexp.MustCompile(
-		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|bg-transform|transform)-(?:query|prompt|(?:border|list|preview|input|header|footer)-label|header-lines|header|footer|search|with-nth|nth|pointer|ghost)|bg-transform|transform|change-(?:preview-window|preview|multi|case-sensitive)|(?:re|un|toggle-)bind|pos|put|print|search|trigger)`)
+		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|bg-transform|transform)-(?:query|prompt|(?:border|list|preview|input|header|footer)-label|header-lines|header|footer|search|with-nth|nth|pointer|ghost|info-command)|bg-transform|transform|change-(?:preview-window|preview|multi|case-sensitive)|(?:re|un|toggle-)bind|pos|put|print|search|trigger)`)
 	splitRegexp = regexp.MustCompile("[,:]+")
 	actionNameRegexp = regexp.MustCompile("(?i)^[a-z-]+")
 }
 
 func maskActionContents(action string) string {
-	masked := ""
+	var sb strings.Builder
 Loop:
 	for len(action) > 0 {
 		loc := argActionRegexp.FindStringIndex(action)
 		if loc == nil {
-			masked += action
+			sb.WriteString(action)
 			break
 		}
-		masked += action[:loc[1]]
+		sb.WriteString(action[:loc[1]])
 		action = action[loc[1]:]
 		if len(action) == 0 {
 			break
@@ -1706,7 +1706,7 @@ Loop:
 		var ce string
 		switch action[0] {
 		case ':':
-			masked += strings.Repeat(" ", len(action))
+			sb.WriteString(strings.Repeat(" ", len(action)))
 			break Loop
 		case '(':
 			ce = ")"
@@ -1727,7 +1727,7 @@ Loop:
 		// @$ or @+
 		loc = regexp.MustCompile(fmt.Sprintf(`(?s)^%s.*?(%s[+,]|%s$)`, cs, ce, ce)).FindStringIndex(action)
 		if loc == nil {
-			masked += action
+			sb.WriteString(action)
 			break
 		}
 		// Keep + or , at the end
@@ -1735,9 +1735,10 @@ Loop:
 		if lastChar == '+' || lastChar == ',' {
 			loc[1]--
 		}
-		masked += strings.Repeat(" ", loc[1])
+		sb.WriteString(strings.Repeat(" ", loc[1]))
 		action = action[loc[1]:]
 	}
+	masked := sb.String()
 	masked = strings.ReplaceAll(masked, ",,,", string([]rune{',', escapedComma, ','}))
 	masked = strings.ReplaceAll(masked, ",:,", string([]rune{',', escapedColon, ','}))
 	masked = strings.ReplaceAll(masked, "::", string([]rune{escapedColon, ':'}))
@@ -2115,6 +2116,8 @@ func isExecuteAction(str string) actionType {
 		return actChangeHeaderLabel
 	case "change-footer-label":
 		return actChangeFooterLabel
+	case "change-info-command":
+		return actChangeInfoCommand
 	case "change-ghost":
 		return actChangeGhost
 	case "change-pointer":
@@ -2161,6 +2164,8 @@ func isExecuteAction(str string) actionType {
 		return actTransformHeaderLabel
 	case "transform-footer-label":
 		return actTransformFooterLabel
+	case "transform-info-command":
+		return actTransformInfoCommand
 	case "transform-footer":
 		return actTransformFooter
 	case "transform-header":
@@ -2195,6 +2200,8 @@ func isExecuteAction(str string) actionType {
 		return actBgTransformHeaderLabel
 	case "bg-transform-footer-label":
 		return actBgTransformFooterLabel
+	case "bg-transform-info-command":
+		return actBgTransformInfoCommand
 	case "bg-transform-footer":
 		return actBgTransformFooter
 	case "bg-transform-header":

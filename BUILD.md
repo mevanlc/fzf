@@ -1,5 +1,4 @@
-Building fzf
-============
+# Building fzf
 
 Build instructions
 ------------------
@@ -19,9 +18,6 @@ make install
 
 # Build fzf binaries and archives for all platforms using goreleaser
 make build
-
-# Publish GitHub release
-make release
 ```
 
 > [!WARNING]

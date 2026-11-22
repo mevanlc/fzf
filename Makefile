@@ -94,8 +94,12 @@ test: $(SOURCES)
 				github.com/junegunn/fzf/src/tui \
 				github.com/junegunn/fzf/src/util
 
+# Run in a separate tmux server without user config, like CI (80x24)
 itest:
-	ruby test/runner.rb
+	@dir=$$(mktemp -d) && \
+	env -u TMUX TMUX_TMPDIR=$$dir sh -c \
+		'tmux -f /dev/null new-session -d && ruby test/runner.rb; s=$$?; tmux kill-server; exit $$s'; \
+	s=$$?; rm -rf $$dir; exit $$s
 
 # Actively fuzz the matcher fast paths against the general algorithm.
 # Go fuzzes one target at a time, so iterate. Override duration with
@@ -139,46 +143,6 @@ prerelease:
 tag: prerelease
 	git tag -s v$(VERSION) -m v$(VERSION)
 	git push origin v$(VERSION)
-
-release:
-	# Make sure that the tests pass and the build works
-	TAGS=tcell make test
-	make test build clean
-
-ifndef GITHUB_TOKEN
-	$(error GITHUB_TOKEN is not defined)
-endif
-
-	# Check if we are on master branch
-ifneq ($(shell git symbolic-ref --short HEAD),master)
-	$(error Not on master branch)
-endif
-
-	# Check if version numbers are properly updated
-	grep -q ^$(VERSION_REGEX)$$ CHANGELOG.md
-	grep -qF '"fzf $(VERSION_TRIM)"' man/man1/fzf.1
-	grep -qF '"fzf $(VERSION_TRIM)"' man/man1/fzf-tmux.1
-	grep -qF $(VERSION) install
-	grep -qF $(VERSION) install.ps1
-
-	# Make release note out of CHANGELOG.md
-	mkdir -p tmp
-	sed -n '/^$(VERSION_REGEX)$$/,/^[0-9]/p' CHANGELOG.md | tail -r | \
-		sed '1,/^ *$$/d' | tail -r | sed 1,2d | tee tmp/release-note
-
-	# Push to temp branch first so that install scripts always works on master branch
-	git checkout -B temp master
-	git push origin temp --follow-tags --force
-
-	# Make a GitHub release
-	goreleaser --clean --release-notes tmp/release-note
-
-	# Push to master
-	git checkout master
-	git push origin master
-
-	# Delete temp branch
-	git push origin --delete temp
 
 clean:
 	$(RM) -r dist target
@@ -229,4 +193,4 @@ update:
 	$(GO) get -u
 	$(GO) mod tidy
 
-.PHONY: all generate build prerelease tag release test itest bench lint install clean docker docker-test update fmt
+.PHONY: all generate build prerelease tag test itest bench lint install clean docker docker-test update fmt

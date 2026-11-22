@@ -470,7 +470,7 @@ type Terminal struct {
 	termSize             tui.TermSize
 	lastAction           actionType
 	lastKey              string
-	lastFocus            int32
+	lastFocus            focusedItem
 	areaLines            int
 	areaColumns          int
 	forcePreview         bool
@@ -493,6 +493,11 @@ type numLinesCacheValue struct {
 type selectedItem struct {
 	at   time.Time
 	item *Item
+}
+
+type focusedItem struct {
+	major int // revision.major; changes on reload
+	item  *Item
 }
 
 type byTimeOrder []selectedItem
@@ -587,6 +592,7 @@ const (
 	actChangeFooter
 	actChangeHeaderLabel
 	actChangeFooterLabel
+	actChangeInfoCommand
 	actChangeInputLabel
 	actChangeListLabel
 	actChangeMulti
@@ -674,6 +680,7 @@ const (
 	actTransformFooter
 	actTransformHeaderLabel
 	actTransformFooterLabel
+	actTransformInfoCommand
 	actTransformInputLabel
 	actTransformListLabel
 	actTransformNth
@@ -694,6 +701,7 @@ const (
 	actBgTransformFooter
 	actBgTransformHeaderLabel
 	actBgTransformFooterLabel
+	actBgTransformInfoCommand
 	actBgTransformInputLabel
 	actBgTransformListLabel
 	actBgTransformNth
@@ -763,6 +771,7 @@ func processExecution(action actionType) bool {
 		actTransformFooter,
 		actTransformHeaderLabel,
 		actTransformFooterLabel,
+		actTransformInfoCommand,
 		actTransformInputLabel,
 		actTransformListLabel,
 		actTransformNth,
@@ -780,6 +789,7 @@ func processExecution(action actionType) bool {
 		actBgTransformFooter,
 		actBgTransformHeaderLabel,
 		actBgTransformFooterLabel,
+		actBgTransformInfoCommand,
 		actBgTransformInputLabel,
 		actBgTransformListLabel,
 		actBgTransformNth,
@@ -791,6 +801,7 @@ func processExecution(action actionType) bool {
 		actBgTransformSearch,
 		actPreview,
 		actChangePreview,
+		actChangeInfoCommand,
 		actRefreshPreview,
 		actExecute,
 		actExecuteSilent,
@@ -837,6 +848,8 @@ type previewRequest struct {
 	list         [3][]*Item // current, select, and all matched items
 	env          []string
 	query        string
+	lastAction   actionType
+	prompt       string
 }
 
 type previewResult struct {
@@ -1193,7 +1206,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox, executor *util.Executor
 		initFunc:           func() error { return renderer.Init() },
 		executing:          util.NewAtomicBool(false),
 		lastAction:         actStart,
-		lastFocus:          minItem.Index(),
+		lastFocus:          focusedItem{},
 		lastActivity:       time.Now(),
 		numLinesCache:      make(map[int32]numLinesCacheValue),
 		// The initial load counts as a search in progress ('start:wait').
@@ -3659,7 +3672,10 @@ func (t *Terminal) printInfoImpl() {
 				pos++
 			}
 		} else {
-			pos = max(pos, t.window.Width()-outputLen-util.StringWidth(t.infoPrefix)-1)
+			move(line, pos, false)
+			newPos := max(pos, t.window.Width()-outputLen-util.StringWidth(t.infoPrefix)-1)
+			t.window.Print(strings.Repeat(" ", newPos-pos))
+			pos = newPos
 			printInfoPrefix()
 		}
 	}
@@ -6074,6 +6090,26 @@ func (t *Terminal) currentIndex() int32 {
 	return minItem.Index()
 }
 
+func (t *Terminal) currentFocus() focusedItem {
+	return focusedItem{t.revision.major, t.currentItem()}
+}
+
+// Records the current focus and returns whether it differs from the last one.
+// Indexes restart after a reload, so items are compared by --id-nth key, if
+// set. Without it, any focused item after a reload is a new one.
+func (t *Terminal) updateFocus() bool {
+	curr := t.currentFocus()
+	last := t.lastFocus
+	t.lastFocus = curr
+	if curr.item == nil || last.item == nil {
+		return curr.item != last.item
+	}
+	if curr.major == last.major {
+		return curr.item.Index() != last.item.Index()
+	}
+	return len(t.idNth) == 0 || t.trackKeyFor(curr.item, t.idNth) != t.trackKeyFor(last.item, t.idNth)
+}
+
 func (t *Terminal) trackKeyFor(item *Item, nth []Range) string {
 	tokens := Tokenize(item.AsString(t.ansi), t.delimiter)
 	return StripLastDelimiter(JoinTokens(Transform(tokens, nth)), t.delimiter)
@@ -6287,6 +6323,43 @@ func (t *Terminal) startTimers(ctx context.Context) {
 	}
 }
 
+// nextValue returns the first valid, non-current value after the current one
+// in a '|'-separated list, and the list rotated to end with it.
+// isValid can be nil.
+func nextValue(expr string, isCurrent func(string) bool, isValid func(string) bool) (string, string) {
+	valid := func(value string) bool {
+		return isValid == nil || isValid(value)
+	}
+	// An invalid value is never current, even if it resolves to the current one
+	current := func(value string) bool {
+		return valid(value) && isCurrent(value)
+	}
+	values := strings.Split(expr, "|")
+	start := 0
+	// Last value is the one applied by the previous call
+	if !current(values[len(values)-1]) {
+		for i, value := range values {
+			if current(value) {
+				start = i + 1
+				break
+			}
+		}
+	}
+	for i := range values {
+		pick := (start + i) % len(values)
+		if value := values[pick]; valid(value) && !current(value) {
+			return value, strings.Join(slices.Concat(values[pick+1:], values[:pick+1]), "|")
+		}
+	}
+	// Nothing to pick
+	for _, value := range values {
+		if valid(value) {
+			return value, expr
+		}
+	}
+	return values[0], expr
+}
+
 // Loop is called to start Terminal I/O
 func (t *Terminal) Loop() error {
 	// prof := profile.Start(profile.ProfilePath("/tmp/"))
@@ -6398,6 +6471,8 @@ func (t *Terminal) Loop() error {
 				var commandTemplate string
 				var env []string
 				var query string
+				var lastAction actionType
+				var prompt string
 				initialOffset := 0
 				t.previewBox.Wait(func(events *util.Events) {
 					for req, value := range *events {
@@ -6412,6 +6487,8 @@ func (t *Terminal) Loop() error {
 							items = request.list
 							env = request.env
 							query = request.query
+							lastAction = request.lastAction
+							prompt = request.prompt
 							requested = true
 						}
 					}
@@ -6426,7 +6503,18 @@ func (t *Terminal) Loop() error {
 				version++
 				// We don't display preview window if no match
 				if items[0] != nil {
-					command, tempFiles := t.replacePlaceholder(commandTemplate, false, query, items)
+					// Not t.replacePlaceholder, which reads fields the main loop writes
+					command, tempFiles := replacePlaceholder(replacePlaceholderParams{
+						template:   commandTemplate,
+						stripAnsi:  t.ansi,
+						delimiter:  t.delimiter,
+						printsep:   t.printsep,
+						query:      query,
+						allItems:   items,
+						lastAction: lastAction,
+						prompt:     prompt,
+						executor:   t.executor,
+					})
 					cmd := t.executor.ExecCommand(command, true)
 					cmd.Env = env
 
@@ -6559,7 +6647,7 @@ func (t *Terminal) Loop() error {
 		if len(command) > 0 && t.canPreview() {
 			_, list := t.buildPlusList(command, false)
 			t.cancelPreview()
-			t.previewBox.Set(reqPreviewEnqueue, previewRequest{command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input)})
+			t.previewBox.Set(reqPreviewEnqueue, previewRequest{command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input), t.lastAction, t.promptString})
 		}
 	}
 
@@ -6639,8 +6727,7 @@ func (t *Terminal) Loop() error {
 							info = true
 						}
 						focusChanged := focusedIndex != currentIndex
-						if (t.hasFocusActions || t.infoCommand != "") && focusChanged && currentIndex != t.lastFocus {
-							t.lastFocus = currentIndex
+						if (t.hasFocusActions || t.infoCommand != "") && !t.trackBlocked && t.updateFocus() {
 							t.eventChan <- tui.Focus.AsEvent()
 							if t.infoCommand != "" {
 								info = true
@@ -7025,9 +7112,11 @@ func (t *Terminal) Loop() error {
 					}
 				}
 
-				if onFocus, prs := t.keymap[tui.Focus.AsEvent()]; prs && iter < maxFocusEvents {
-					if newIndex := t.currentIndex(); newIndex != currentIndex {
-						t.lastFocus = newIndex
+				// Actions are ignored while blocked. The render loop will
+				// report the focus after the reload.
+				if onFocus, prs := t.keymap[tui.Focus.AsEvent()]; prs && iter < maxFocusEvents && !t.trackBlocked {
+					if t.currentIndex() != currentIndex {
+						t.lastFocus = t.currentFocus()
 						if t.infoCommand != "" {
 							req(reqInfo)
 						}
@@ -7173,7 +7262,7 @@ func (t *Terminal) Loop() error {
 						if valid {
 							t.cancelPreview()
 							t.previewBox.Set(reqPreviewEnqueue,
-								previewRequest{t.previewOpts.command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input)})
+								previewRequest{t.previewOpts.command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input), t.lastAction, t.promptString})
 						}
 					} else {
 						// Discard the preview content so that it won't accidentally appear
@@ -7291,22 +7380,35 @@ func (t *Terminal) Loop() error {
 				req(reqList, reqInfo)
 			case actChangeNth, actTransformNth, actBgTransformNth:
 				capture(true, func(expr string) {
-					// Split nth expression
-					tokens := strings.Split(expr, "|")
-					if nth, err := splitNth(tokens[0]); err == nil || len(expr) == 0 {
-						// Changed
+					resolve := func(value string) ([]Range, bool) {
+						// Empty value restores the default --nth
+						if len(value) == 0 {
+							return t.nth, true
+						}
+						nth, err := splitNth(value)
+						return nth, err == nil
+					}
+					// Empty range list or a single '..' means all fields
+					allFields := func(nth []Range) bool {
+						return len(nth) == 0 || len(nth) == 1 && nth[0].IsFull()
+					}
+					isCurrent := func(nth []Range) bool {
+						return compareRanges(t.nthCurrent, nth) || allFields(t.nthCurrent) && allFields(nth)
+					}
+					// Only change-nth cycles through '|'-separated values
+					if a.t == actChangeNth {
+						expr, a.a = nextValue(expr, func(value string) bool {
+							nth, _ := resolve(value)
+							return isCurrent(nth)
+						}, func(value string) bool {
+							_, ok := resolve(value)
+							return ok
+						})
+					}
+					if nth, ok := resolve(expr); ok && !isCurrent(nth) {
 						newNth = &nth
-					} else {
-						// The default
-						newNth = &t.nth
-					}
-					// Cycle
-					if len(tokens) > 1 {
-						a.a = strings.Join(append(tokens[1:], tokens[0]), "|")
-					}
-					if !compareRanges(t.nthCurrent, *newNth) {
 						changed = true
-						t.nthCurrent = *newNth
+						t.nthCurrent = nth
 						t.forceRerenderList()
 					}
 				})
@@ -7315,15 +7417,22 @@ func (t *Terminal) Loop() error {
 					break Action
 				}
 				capture(true, func(expr string) {
-					tokens := strings.Split(expr, "|")
-					withNthExpr := tokens[0]
-					if len(tokens) > 1 {
-						a.a = strings.Join(append(tokens[1:], tokens[0]), "|")
+					resolve := func(value string) string {
+						// Empty value restores the default --with-nth
+						if len(value) == 0 {
+							return t.withNthDefault
+						}
+						return value
 					}
-					// Empty value restores the default --with-nth
-					if len(withNthExpr) == 0 {
-						withNthExpr = t.withNthDefault
+					if a.t == actChangeWithNth {
+						expr, a.a = nextValue(expr, func(value string) bool {
+							return resolve(value) == t.withNthExpr
+						}, func(value string) bool {
+							_, err := nthTransformer(resolve(value))
+							return err == nil
+						})
 					}
+					withNthExpr := resolve(expr)
 					if withNthExpr != t.withNthExpr {
 						if factory, err := nthTransformer(withNthExpr); err == nil {
 							newWithNth = &withNthSpec{fn: factory(t.delimiter)}
@@ -7376,6 +7485,13 @@ func (t *Terminal) Loop() error {
 					t.footerLabelOpts.label = label
 					t.footerLabel, t.footerLabelLen = t.ansiLabelPrinter(label, &tui.ColFooterLabel, false)
 					req(reqRedrawFooterLabel)
+				})
+			case actChangeInfoCommand, actTransformInfoCommand, actBgTransformInfoCommand:
+				capture(true, func(command string) {
+					if t.infoCommand != command {
+						t.infoCommand = command
+						req(reqInfo)
+					}
 				})
 			case actChangeInputLabel, actTransformInputLabel, actBgTransformInputLabel:
 				capture(true, func(label string) {
